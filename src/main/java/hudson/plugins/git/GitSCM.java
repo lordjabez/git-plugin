@@ -316,7 +316,7 @@ public class GitSCM extends GitSCMBackwardCompatibility {
     public GitRepositoryBrowser getBrowser() {
         return browser;
     }
-    
+
     @Override public RepositoryBrowser<?> guessBrowser() {
         if (remoteRepositories != null && remoteRepositories.size() == 1) {
             List<URIish> uris = remoteRepositories.get(0).getURIs();
@@ -1022,6 +1022,17 @@ public class GitSCM extends GitSCMBackwardCompatibility {
         }
     }
 
+    private Branch getRevCanonicalBranch(Revision r) {
+        for (Iterator<Branch> j = r.getBranches().iterator(); j.hasNext();) {
+            Branch b = j.next();
+            String name = b.getName();
+            if (name != null && name.startsWith("blessed")) {
+                return b;
+            }
+        }
+        return Iterables.getFirst(r.getBranches(), null);
+    }
+
     @Override
     public void checkout(Run<?, ?> build, Launcher launcher, FilePath workspace, TaskListener listener, File changelogFile, SCMRevisionState baseline)
             throws IOException, InterruptedException {
@@ -1047,8 +1058,9 @@ public class GitSCM extends GitSCMBackwardCompatibility {
         Build revToBuild = determineRevisionToBuild(build, buildData, environment, git, listener);
 
         environment.put(GIT_COMMIT, revToBuild.revision.getSha1String());
-        Branch branch = Iterables.getFirst(revToBuild.revision.getBranches(),null);
-        if (branch != null && branch.getName() != null) { // null for a detached HEAD
+
+        Branch branch = getRevCanonicalBranch(revToBuild.revision);
+        if (branch!=null && branch.getName() != null) { // null for a detached HEAD
             environment.put(GIT_BRANCH, getBranchName(branch));
         }
 
@@ -1163,7 +1175,7 @@ public class GitSCM extends GitSCMBackwardCompatibility {
         super.buildEnvVars(build, env);
         Revision rev = fixNull(getBuildData(build)).getLastBuiltRevision();
         if (rev!=null) {
-            Branch branch = Iterables.getFirst(rev.getBranches(), null);
+            Branch branch = getRevCanonicalBranch(rev);
             if (branch!=null && branch.getName()!=null) {
                 env.put(GIT_BRANCH, getBranchName(branch));
 
@@ -1184,7 +1196,7 @@ public class GitSCM extends GitSCMBackwardCompatibility {
             }
         }
 
-       
+
         if (userRemoteConfigs.size()==1){
             env.put("GIT_URL", userRemoteConfigs.get(0).getUrl());
         } else {
@@ -1192,7 +1204,7 @@ public class GitSCM extends GitSCMBackwardCompatibility {
             for(UserRemoteConfig config:userRemoteConfigs)   {
                 env.put("GIT_URL_"+count, config.getUrl());
                 count++;
-            }  
+            }
         }
 
         getDescriptor().populateEnvironmentVariables(env);
@@ -1200,7 +1212,7 @@ public class GitSCM extends GitSCMBackwardCompatibility {
             ext.populateEnvironmentVariables(this, env);
         }
     }
-    
+
     private String getBranchName(Branch branch)
     {
         String name = branch.getName();

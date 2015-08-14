@@ -45,12 +45,23 @@ public class DefaultBuildChooser extends BuildChooser {
                                                       GitClient git, TaskListener listener, BuildData data, BuildChooserContext context)
             throws GitException, IOException, InterruptedException {
 
-        verbose(listener,"getCandidateRevisions({0},{1},,,{2}) considering branches to build",isPollCall,branchSpec,data);
+        EnvVars env = context.getEnvironment();
+
+        String branchVariable = env.get("branch");
+
+        verbose(listener,"getCandidateRevisions({0},{1},{2},{3}) considering branches to build",isPollCall,branchVariable, branchSpec,data);
+
+        if ( branchVariable != null && branchSpec == null) {
+            branchSpec = branchVariable;
+            verbose(listener, "Setting null branch spec to branch variable");
+        };
 
         // if the branch name contains more wildcards then the simple usecase
         // does not apply and we need to skip to the advanced usecase
-        if (isAdvancedSpec(branchSpec))
+        if (isAdvancedSpec(branchSpec)) {
+            verbose(listener, "Using advanced candidate selector due to branchSpec of {0}", branchSpec);
             return getAdvancedCandidateRevisions(isPollCall,listener,new GitUtils(listener,git),data, context);
+        }
 
         // check if we're trying to build a specific commit
         // this only makes sense for a build, there is no
@@ -120,7 +131,7 @@ public class DefaultBuildChooser extends BuildChooser {
                 verbose(listener, "{0} seems to be a non-branch reference (tag?)");
             }
         }
-        
+
         return revisions;
     }
 
@@ -225,7 +236,7 @@ public class DefaultBuildChooser extends BuildChooser {
                     j.remove();
                 }
             }
-            
+
             // filter out HEAD ref if it's not the only ref
             if (r.getBranches().size() > 1) {
                 for (Iterator<Branch> j = r.getBranches().iterator(); j.hasNext();) {
@@ -257,7 +268,7 @@ public class DefaultBuildChooser extends BuildChooser {
 
             if (data.hasBeenBuilt(r.getSha1())) {
                 i.remove();
-                
+
                 // keep track of new branches pointing to the last built revision
                 if (lastBuiltRevision != null && lastBuiltRevision.getSha1().equals(r.getSha1())) {
                 	lastBuiltRevision = r;
@@ -291,7 +302,7 @@ public class DefaultBuildChooser extends BuildChooser {
      * Write the message to the listener only when the verbose mode is on.
      */
     private void verbose(TaskListener listener, String format, Object... args) {
-        if (GitSCM.VERBOSE)
+        //if (GitSCM.VERBOSE)
             listener.getLogger().println(MessageFormat.format(format,args));
     }
 
